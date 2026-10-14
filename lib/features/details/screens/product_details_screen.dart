@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
-import '../../home/services/models/products_model.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../home/domain/entity/home_product_entity.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
-  final ProductModel product;
+  final HomeProductEntity product;
 
   const ProductDetailsScreen({super.key, required this.product});
 
