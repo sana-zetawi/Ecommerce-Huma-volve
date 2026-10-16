@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/theme.dart';
-import '../../../../details/screens/product_details_screen.dart';
+import '../../../../details/presentions/view/product_details_screen.dart';
 import '../../../domain/entity/home_product_entity.dart';
 
 class ProductCard extends StatelessWidget {
@@ -17,7 +17,7 @@ class ProductCard extends StatelessWidget {
           PageRouteBuilder(
             transitionDuration: const Duration(milliseconds: 500),
             pageBuilder: (context, animation, secondaryAnimation) => 
-                ProductDetailsScreen(product: product),
+                ProductDetailsScreen(productId: product.id ?? 0),
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },

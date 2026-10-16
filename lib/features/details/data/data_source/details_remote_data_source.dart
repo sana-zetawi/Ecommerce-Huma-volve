@@ -1,0 +1,8 @@
+import '../models/details_model.dart';
+
+abstract class ProductDetailsRemoteDataSource {
+
+  Future<ProductDetailsModel> getProductDetails({
+    required int id
+  });
+}
