@@ -17,10 +17,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategoryIndex = 0;
-   @override
+  late ScrollController _scrollController;
+  @override
   void initState() {
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onListen);
     context.read<HomeCubit>().loadDate();
     super.initState();
+  }
+
+  void _onListen() {
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    final targetDistance = 200.0; // Adjust this value as needed
+    if (currentScroll >= maxScroll - targetDistance) {
+      context.read<HomeCubit>().loadMoreProducts();
+    }
   }
 
   @override
@@ -29,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
@@ -120,15 +133,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       buildWhen: (previous, current) {
                         if (current is ProductsLoading ||
                             current is ProductsSuccess ||
-                            current is ProductsFailure ) {
+                            current is ProductsFailure ||
+                            current is ProductsLoadingMore ||
+                            current is ProductsLoadingFailure) {
                           return false;
-                        }else {
+                        } else {
                           return true;
                         }
                       },
                       builder: (context, state) {
                         if (state is CategoriesLoading) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         } else if (state is CategoriesSuccess) {
                           final categories = state.categories;
                           return SizedBox(
@@ -141,14 +158,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               itemBuilder: (context, index) {
                                 final category = categories[index];
                                 return CategoryChip(
-                                  label: category.name??'',
-                                  isSelected:
-                                      _selectedCategoryIndex == index,
+                                  label: category.name ?? '',
+                                  isSelected: _selectedCategoryIndex == index,
                                   onTap: () {
                                     setState(() {
                                       _selectedCategoryIndex = index;
                                     });
-                                    context.read<HomeCubit>().loadProductsByCategoryId(categories[index].id);
+                                    context
+                                        .read<HomeCubit>()
+                                        .loadProductsByCategoryId(
+                                          categories[index].id,
+                                        );
                                   },
                                 );
                               },
@@ -162,19 +182,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         return const SizedBox.shrink();
                       },
                     ),
-                    ],
+                  ],
                 ),
               ),
             ),
             BlocBuilder<HomeCubit, HomeState>(
               buildWhen: (previous, current) {
-                if (current is CategoriesLoading ||
-                    current is CategoriesSuccess ||
-                    current is CategoriesFailure ) {
+                if (current is ProductsLoadingFailure ||
+                    current is ProductsLoadingMore) {
                   return false;
-                }else {
-                  return true;
                 }
+                return true;
               },
               builder: (context, state) {
                 if (state is ProductsLoading) {
@@ -188,17 +206,43 @@ class _HomeScreenState extends State<HomeScreen> {
                     sliver: SliverGrid(
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.7,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.7,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         return ProductCard(product: products[index]);
                       }, childCount: products.length),
                     ),
                   );
                 } else if (state is ProductsFailure) {
+                  return SliverToBoxAdapter(
+                    child: Center(child: Text('Error: ${state.errorMessage}')),
+                  );
+                }
+                
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              },
+            ),
+            BlocBuilder<HomeCubit, HomeState>(
+              buildWhen: (previous, current) {
+                if (current is ProductsLoading ||
+                    current is ProductsSuccess ||
+                    current is ProductsFailure) {
+                  return false;
+                }
+                return true;
+              },
+              builder: (context, state) {
+                if (state is ProductsLoadingMore) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 20.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                } else if (state is ProductsLoadingFailure) {
                   return SliverToBoxAdapter(
                     child: Center(
                       child: Text('Error: ${state.errorMessage}'),
