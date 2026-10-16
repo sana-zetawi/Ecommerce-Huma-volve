@@ -1,31 +1,67 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme.dart';
-import '../../../core/widgets/primary_button.dart';
-import '../../home/domain/entity/home_product_entity.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-class ProductDetailsScreen extends StatefulWidget {
-  final HomeProductEntity product;
+import '../../../../core/networks/api_clints.dart';
+import '../../../../core/theme.dart';
+import '../../../../core/widgets/primary_button.dart';
+import '../../data/data_source/details_remote_data_source.dart';
+import '../../data/data_source/details_remote_data_source_imp.dart';
+import '../../data/repository/details_repository_imp.dart';
+import '../../domain/repository/details_repository.dart';
+import '../../domain/use_cases/details_use_case.dart';
+import '../view_model/details_cubit.dart';
+import '../view_model/details_state.dart';
+import 'widgets/share_button.dart';
 
-  const ProductDetailsScreen({super.key, required this.product});
+class ProductDetailsScreen extends StatelessWidget {
+  final int productId;
 
-  @override
-  State<ProductDetailsScreen> createState() => _ProductDetailsScreenState();
-}
-
-class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
-  // late Color _selectedColor;
-  // late String _selectedSize;
-
-  @override
-  void initState() {
-    super.initState();
-    // _selectedColor = widget.product.colors.first;
-    // _selectedSize = widget.product.sizes.first;
-  }
+  const ProductDetailsScreen({super.key, required this.productId});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final ApiClints apiClints = ApiClints();
+    final ProductDetailsRemoteDataSource productDetailsRemoteDataSource =
+        ProductDetailsRemoteDataSourceImp(apiClints);
+    final ProductDetailsRepository productDetailsRepository =
+        ProductDetailsRepositoryImp(productDetailsRemoteDataSource);
+    final ProductDetailsUseCase productDetailsUseCase = ProductDetailsUseCase(
+      productDetailsRepository: productDetailsRepository,
+    );
+    return BlocProvider(
+      create: (context) =>
+          DetailsCubit(productDetailsUseCase)
+            ..getProductDetails(productId: productId),
+      child: ProductDetailsView(productId: productId),
+    );
+  }
+}
+
+class ProductDetailsView extends StatefulWidget {
+  final int productId;
+  const ProductDetailsView({super.key, required this.productId});
+
+  @override
+  State<ProductDetailsView> createState() => _ProductDetailsViewState();
+}
+
+class _ProductDetailsViewState extends State<ProductDetailsView> {
+  @override
+Widget build(BuildContext context) {
+  return BlocBuilder<DetailsCubit, DetailsState>(
+    builder: (context, state) {
+      if (state is DetailsLoading) {
+        return const Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      if (state is DetailsSuccess) {
+        final product = state.productDetailsEntity;
+
+        return Scaffold(
       backgroundColor: AppTheme.background,
       body: CustomScrollView(
         slivers: [
@@ -45,6 +81,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
+              ShareButton(productId: widget.productId),
               IconButton(
                 icon: Container(
                   padding: const EdgeInsets.all(8),
@@ -60,9 +97,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Hero(
-                tag: 'product-${widget.product.id}',
+                tag: 'product-${product.id}',
                 child: Image.network(
-                  widget.product.images?.first ?? 'https://via.placeholder.com/150',
+                  product.images?.first ??
+                      'https://via.placeholder.com/150',
                   fit: BoxFit.cover,
                 ),
               ),
@@ -86,37 +124,30 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.product.title ?? '',
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              fontSize: 28,
-                              height: 1.2,
-                            ),
+                         product.title ?? '',
+                            style: Theme.of(context).textTheme.headlineLarge
+                                ?.copyWith(fontSize: 28, height: 1.2),
                           ),
                         ),
                         const SizedBox(width: 16),
                         Text(
-                          '\$${widget.product.price!.toStringAsFixed(2)}',
-                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            color: AppTheme.primary,
-                            fontSize: 24,
-                          ),
+                          '\$${product.price!.toStringAsFixed(2)}',
+                          style: Theme.of(context).textTheme.headlineLarge
+                              ?.copyWith(color: AppTheme.primary, fontSize: 24),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     Text(
                       'Description',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context).textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      widget.product.description??'',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        height: 1.6,
-                        fontSize: 16,
-                      ),
+                      product.description ?? '',
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(height: 1.6, fontSize: 16),
                     ),
                     const SizedBox(height: 24),
                     // Text(
@@ -158,7 +189,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('${widget.product.title ?? ''} added to cart'),
+                            content: Text(
+                              '${product.title ?? ''} added to cart',
+                            ),
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -177,5 +210,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ],
       ),
     );
-  }
+      }
+
+      if (state is DetailsFailure) {
+        return Scaffold(
+          body: Center(
+            child: Text(state.errorMessage),
+          ),
+        );
+      }
+
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    },
+  );
+}
 }
